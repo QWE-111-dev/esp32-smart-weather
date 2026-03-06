@@ -40,62 +40,30 @@
         </div>
     </div>
 
-    <script>
-        // ================= 我的ESP32气象站 =================
-        const CHANNEL_ID = '3288396'; 
-        const READ_API_KEY = 'JUDMG2J8A59TGVI0';
-        // =================================================================
+   <script>
+    function fetchMyBackend() {
+        // 直接请求你自己写的后端接口！
+        fetch('/api/weather')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    // 拿到后端直接算好的现成数据，直接显示
+                    document.getElementById('temp').innerText = data.temperature;
+                    document.getElementById('hum').innerText = data.humidity + '%';
+                    document.getElementById('feels-like').innerText = data.feels_like;
+                    document.getElementById('desc').innerText = data.description;
+                    
+                    // 其他 UI 模拟效果保留
+                    document.getElementById('wind').innerText = (Math.floor(Math.random() * 3) + 1) + ' 级'; 
+                    document.getElementById('pressure').innerText = (1010 + Math.random() * 5).toFixed(1) + ' hPa';
+                }
+            })
+            .catch(err => console.log('连接后端失败', err));
+    }
 
-        let sessionMaxT = -100;
-        let sessionMinT = 100;
-
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('clock').innerText = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-        }
-        setInterval(updateClock, 1000); updateClock();
-
-        function fetchCloudData() {
-            // 向 ThingSpeak 专属云端 API 索要最新的一条数据
-            const url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${READ_API_KEY}&results=1`;
-            
-            fetch(url)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.feeds && data.feeds.length > 0) {
-                        let t = parseFloat(data.feeds[0].field1);
-                        let h = parseFloat(data.feeds[0].field2);
-                        
-                        // 极值追踪记录在前端
-                        if (t > sessionMaxT) sessionMaxT = t;
-                        if (t < sessionMinT) sessionMinT = t;
-
-                        document.getElementById('temp').innerText = t;
-                        document.getElementById('hum').innerText = h + '%';
-                        document.getElementById('max-t').innerText = sessionMaxT + '°';
-                        document.getElementById('min-t').innerText = sessionMinT + '°';
-                        
-                        let feelsLike = t > 25 ? t + (h - 40) * 0.05 : (t < 15 ? t - (h * 0.02) : t);
-                        document.getElementById('feels-like').innerText = feelsLike.toFixed(1);
-
-                        // 智能推算逻辑与之前完全一致
-                        let yi = "专注学习、室内阅读", ji = "长时间熬夜", uvStr = "较弱", descStr = '😊 气候适宜', bgStr = 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)';
-                        if (t >= 30) { yi = "开空调、多喝水"; ji = "户外暴晒"; uvStr = "极强"; descStr = '🥵 酷热难耐'; bgStr = 'linear-gradient(135deg, #ff0844 0%, #ffb199 100%)'; } 
-                        else if (t <= 15) { yi = "泡脚、添衣保暖"; ji = "吃冷饮、吹冷风"; uvStr = "很弱"; descStr = '🥶 注意保暖'; bgStr = 'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)'; }
-                        
-                        document.getElementById('yi-text').innerText = yi; document.getElementById('ji-text').innerText = ji;
-                        document.getElementById('desc').innerText = descStr; document.getElementById('uv').innerText = uvStr;
-                        document.getElementById('bg').style.background = bgStr;
-                        document.getElementById('wind').innerText = (Math.floor(Math.random() * 3) + 1) + ' 级'; 
-                        document.getElementById('pressure').innerText = (1010 + Math.random() * 5).toFixed(1) + ' hPa';
-                    }
-                })
-                .catch(err => console.log('拉取数据失败', err));
-        }
-
-        // ThingSpeak 免费版建议每 15-20 秒拉取一次
-        setInterval(fetchCloudData, 15000);
-        fetchCloudData();
-    </script>
+    // 每隔 15 秒向后端请求一次
+    setInterval(fetchMyBackend, 15000);
+    fetchMyBackend();
+</script>
 </body>
 </html>
