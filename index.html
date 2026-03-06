@@ -3,67 +3,215 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>全能气象管家 (远程版)</title>
+    <title>全能环境与资产管家</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, sans-serif; min-height: 100vh; display: flex; justify-content: center; align-items: center; background: linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%); transition: background 1s ease; color: white; padding: 20px;}
-        .app-container { width: 100%; max-width: 420px; border-radius: 30px; background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.3); box-shadow: 0 15px 35px rgba(0,0,0,0.1); padding: 25px; display: flex; flex-direction: column; gap: 20px; }
+        body { font-family: -apple-system, sans-serif; min-height: 100vh; display: flex; justify-content: center; align-items: center; background: linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%); transition: background 1s ease; color: white; padding: 15px;}
+        
+        /* 3D 翻转容器 */
+        .flip-container { perspective: 1000px; width: 100%; max-width: 420px; }
+        .flipper { transition: 0.8s; transform-style: preserve-3d; position: relative; width: 100%; height: 760px; }
+        .front, .back { backface-visibility: hidden; position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 30px; background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.3); box-shadow: 0 15px 35px rgba(0,0,0,0.1); padding: 25px; display: flex; flex-direction: column; gap: 12px; }
+        .back { transform: rotateY(180deg); background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%); }
+        .flip-container.flipped .flipper { transform: rotateY(180deg); }
+
+        /* 顶部时钟与主气象区 */
         .header { display: flex; justify-content: space-between; font-weight: 600; font-size: 1.1rem; opacity: 0.9;}
-        .main-weather { text-align: center; margin: 10px 0; }
-        .temp-display { font-size: 6rem; font-weight: 700; line-height: 1; text-shadow: 2px 4px 10px rgba(0,0,0,0.15); }
-        .feels-like { font-size: 1.1rem; opacity: 0.9; margin-top: 5px; }
-        .weather-desc { font-size: 1.3rem; margin-top: 10px; font-weight: 500; background: rgba(0,0,0,0.1); display: inline-block; padding: 5px 15px; border-radius: 20px;}
-        .life-index { background: rgba(255,255,255,0.2); border-radius: 20px; padding: 15px; font-size: 0.95rem; line-height: 1.6;}
-        .life-item { display: flex; margin-bottom: 8px; }
-        .tag-yi { background: #4cd137; color: white; padding: 2px 8px; border-radius: 8px; font-weight: bold; margin-right: 10px; font-size: 0.85rem;}
-        .tag-ji { background: #e84118; color: white; padding: 2px 8px; border-radius: 8px; font-weight: bold; margin-right: 10px; font-size: 0.85rem;}
-        .grid-6 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-        .grid-box { background: rgba(0, 0, 0, 0.1); padding: 12px 5px; border-radius: 15px; text-align: center; font-size: 0.8rem; display: flex; flex-direction: column; justify-content: space-between; }
-        .grid-box span.val { font-size: 1.1rem; font-weight: bold; margin-top: 8px; display: block;}
+        .main-weather { text-align: center; margin: 5px 0; }
+        .temp-display { font-size: 5.5rem; font-weight: 700; line-height: 1; text-shadow: 2px 4px 10px rgba(0,0,0,0.15); }
+        .feels-like { font-size: 1.05rem; opacity: 0.9; margin-top: 5px; }
+        .weather-desc { font-size: 1.1rem; margin-top: 10px; font-weight: 500; background: rgba(0,0,0,0.1); display: inline-block; padding: 5px 15px; border-radius: 20px;}
+        
+        /* 宜忌推算区 */
+        .life-index { background: rgba(255,255,255,0.2); border-radius: 15px; padding: 12px; font-size: 0.9rem; line-height: 1.5;}
+        .life-item { display: flex; margin-bottom: 6px; }
+        .life-item:last-child { margin-bottom: 0; }
+        .tag-yi { background: #4cd137; color: white; padding: 2px 8px; border-radius: 6px; font-weight: bold; margin-right: 8px; font-size: 0.8rem;}
+        .tag-ji { background: #e84118; color: white; padding: 2px 8px; border-radius: 6px; font-weight: bold; margin-right: 8px; font-size: 0.8rem;}
+
+        /* 底部 6 宫格数据 */
+        .grid-6 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .grid-box { background: rgba(0, 0, 0, 0.1); padding: 10px 5px; border-radius: 12px; text-align: center; font-size: 0.75rem; display: flex; flex-direction: column; justify-content: space-between; }
+        .grid-box span.val { font-size: 1.05rem; font-weight: bold; margin-top: 5px; display: block;}
+        .grid-box .icon { font-size: 1.1rem; margin-bottom: 2px;}
+
+        /* 互动按钮网格排版 */
+        .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: auto;}
+        .action-btn { background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.4); padding: 12px 5px; border-radius: 15px; color: white; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center;}
+        .action-btn:active { transform: scale(0.95); }
+        .btn-gold { grid-column: span 2; background: linear-gradient(135deg, #f6d365 0%, #fda085 100%); border: none; font-size: 1rem; padding: 15px; text-shadow: 1px 1px 2px rgba(0,0,0,0.2);}
+
+        /* 弹窗样式 */
+        .modal { display: none; position: fixed; z-index: 10; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); justify-content: center; align-items: center; padding: 20px;}
+        .modal-content { background: #fff; color: #333; padding: 25px; border-radius: 20px; width: 100%; max-width: 350px; text-align: left; box-shadow: 0 10px 30px rgba(0,0,0,0.2); animation: pop 0.3s ease;}
+        @keyframes pop { from {transform: scale(0.8); opacity: 0;} to {transform: scale(1); opacity: 1;} }
+        .close-btn { background: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; margin-top: 20px; width: 100%; font-weight: bold;}
     </style>
 </head>
 <body id="bg">
-    <div class="app-container">
-        <div class="header"><div>📍 远程环境监控</div><div id="clock">00:00</div></div>
-        <div class="main-weather"><div class="temp-display"><span id="temp">--</span>°</div><div class="feels-like">体感温度 <span id="feels-like">--</span>°C</div><div class="weather-desc" id="desc">连接云端中...</div></div>
-        <div class="life-index">
-            <div class="life-item"><div class="tag-yi">宜</div><div id="yi-text">...</div></div>
-            <div class="life-item"><div class="tag-ji">忌</div><div id="ji-text">...</div></div>
-        </div>
-        <div class="grid-6">
-            <div class="grid-box"><div>💧</div>湿度<span class="val" id="hum">--%</span></div>
-            <div class="grid-box"><div>☀️</div>紫外线<span class="val" id="uv">--</span></div>
-            <div class="grid-box"><div>🎐</div>风力<span class="val" id="wind">--级</span></div>
-            <div class="grid-box"><div>⏱️</div>气压<span class="val" id="pressure">--hPa</span></div>
-            <div class="grid-box"><div>📈</div>最高温<span class="val" id="max-t">--°</span></div>
-            <div class="grid-box"><div>📉</div>最低温<span class="val" id="min-t">--°</span></div>
+    <div class="flip-container" id="flip-box">
+        <div class="flipper">
+            
+            <div class="front">
+                <div class="header">
+                    <div>📍 智能空间</div>
+                    <div id="clock">00:00</div>
+                </div>
+                
+                <div class="main-weather">
+                    <div class="temp-display"><span id="temp">--</span>°</div>
+                    <div class="feels-like">体感温度 <span id="feels-like">--</span>°C</div>
+                    <div class="weather-desc" id="desc">正在拉取环境数据...</div>
+                </div>
+
+                <div class="life-index">
+                    <div class="life-item"><div class="tag-yi">宜</div><div id="yi-text">加载中...</div></div>
+                    <div class="life-item"><div class="tag-ji">忌</div><div id="ji-text">加载中...</div></div>
+                </div>
+                
+                <div class="grid-6">
+                    <div class="grid-box"><div class="icon">💧</div>湿度<span class="val" id="hum">--%</span></div>
+                    <div class="grid-box"><div class="icon">☀️</div>紫外线<span class="val" id="uv">--</span></div>
+                    <div class="grid-box"><div class="icon">🎐</div>风力<span class="val" id="wind">--级</span></div>
+                    <div class="grid-box"><div class="icon">⏱️</div>气压<span class="val" id="pressure">--hPa</span></div>
+                    <div class="grid-box"><div class="icon">📈</div>最高温<span class="val" id="max-t">--°</span></div>
+                    <div class="grid-box"><div class="icon">📉</div>最低温<span class="val" id="min-t">--°</span></div>
+                </div>
+
+                <div class="action-grid">
+                    <div class="action-btn" onclick="checkClothes()">👕 材质穿搭解析</div>
+                    <div class="action-btn" onclick="checkHomestead()">🏠 建筑防潮评估</div>
+                    <div class="action-btn btn-gold" onclick="flipToGold()">💰 一键切换市场黄金看板 🔄</div>
+                </div>
+            </div>
+
+            <div class="back">
+                <div class="header"><div>📈 宏观市场视图</div><div onclick="flipToWeather()" style="cursor: pointer;">🔙 返回环境</div></div>
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex-grow: 1;">
+                    <div style="color: #f6d365; font-weight: bold; margin-bottom: 10px;">国际黄金参考价 (实时模拟)</div>
+                    <div style="font-size: 5rem; font-weight: bold; color: #f6d365; text-shadow: 2px 4px 10px rgba(0,0,0,0.2);"><span id="gold-price">485.20</span></div>
+                    <div style="font-size: 1.1rem; opacity: 0.9;">CNY / 克</div>
+                    <div style="font-size: 0.9rem; background: rgba(0,0,0,0.2); padding: 8px 15px; border-radius: 15px; margin-top: 20px; color: #a8e6cf;" id="gold-trend">🟢 震荡微涨，保持关注</div>
+                </div>
+                <div class="action-btn" style="background: rgba(255,255,255,0.1); padding: 15px; font-size: 1rem;" onclick="flipToWeather()">🔙 翻转回物理空间</div>
+            </div>
+
         </div>
     </div>
 
-   <script>
-    function fetchMyBackend() {
-        // 直接请求你自己写的后端接口！
-        fetch('/api/weather')
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    // 拿到后端直接算好的现成数据，直接显示
-                    document.getElementById('temp').innerText = data.temperature;
-                    document.getElementById('hum').innerText = data.humidity + '%';
-                    document.getElementById('feels-like').innerText = data.feels_like;
-                    document.getElementById('desc').innerText = data.description;
+    <div id="myModal" class="modal">
+        <div class="modal-content">
+            <h3 id="modal-title" style="margin-bottom: 15px; font-size: 1.2rem;">提示</h3>
+            <p id="modal-text" style="line-height: 1.6; font-size: 0.95rem; color: #555;"></p>
+            <button class="close-btn" onclick="closeModal()">我知道了</button>
+        </div>
+    </div>
+
+    <script>
+        // ================= 我的ESP32气象站 =================
+        const CHANNEL_ID = '3288396'; 
+        const READ_API_KEY = 'JUDMG2J8A59TGVI0';
+        // ==============================================================
+
+        let currentT = 0;
+        let currentH = 0;
+        let sessionMaxT = -100;
+        let sessionMinT = 100;
+
+        // 1. 时钟
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+        }
+        setInterval(updateClock, 1000); updateClock();
+
+        // 2. 核心数据拉取与综合渲染
+        function fetchCloudData() {
+            const url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${READ_API_KEY}&results=1`;
+            fetch(url).then(res => res.json()).then(data => {
+                if (data.feeds && data.feeds.length > 0) {
+                    currentT = parseFloat(data.feeds[0].field1);
+                    currentH = parseFloat(data.feeds[0].field2);
                     
-                    // 其他 UI 模拟效果保留
+                    // 极值追踪
+                    if (currentT > sessionMaxT) sessionMaxT = currentT;
+                    if (currentT < sessionMinT) sessionMinT = currentT;
+
+                    // 填入 6 宫格真实数据
+                    document.getElementById('temp').innerText = currentT;
+                    document.getElementById('hum').innerText = currentH + '%';
+                    document.getElementById('max-t').innerText = sessionMaxT + '°';
+                    document.getElementById('min-t').innerText = sessionMinT + '°';
+                    
+                    // 算法：体感温度
+                    let feelsLike = currentT > 25 ? currentT + (currentH - 40) * 0.05 : (currentT < 15 ? currentT - (currentH * 0.02) : currentT);
+                    document.getElementById('feels-like').innerText = feelsLike.toFixed(1);
+
+                    // 算法：智能宜忌与背景UI
+                    let yi = "专注学习、室内阅读", ji = "长时间熬夜", uvStr = "较弱", descStr = '😊 气候适宜', bgStr = 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)';
+                    
+                    if (currentT >= 30) { 
+                        yi = "开空调、多喝水"; ji = "户外暴晒、剧烈运动"; uvStr = "极强"; descStr = '🥵 酷热难耐'; 
+                        bgStr = 'linear-gradient(135deg, #ff0844 0%, #ffb199 100%)'; 
+                    } else if (currentT <= 15) { 
+                        yi = "泡脚、添衣保暖"; ji = "吃冷饮、吹冷风"; uvStr = "很弱"; descStr = '🥶 寒气袭人'; 
+                        bgStr = 'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)'; 
+                    }
+                    
+                    if (currentH >= 75) { ji += "、晾晒衣物"; if (currentT > 25) descStr = '💦 闷热潮湿'; }
+                    
+                    document.getElementById('yi-text').innerText = yi; document.getElementById('ji-text').innerText = ji;
+                    document.getElementById('desc').innerText = descStr; document.getElementById('uv').innerText = uvStr;
+                    document.getElementById('bg').style.background = bgStr;
+
+                    // UI 预留接口模拟数据
                     document.getElementById('wind').innerText = (Math.floor(Math.random() * 3) + 1) + ' 级'; 
                     document.getElementById('pressure').innerText = (1010 + Math.random() * 5).toFixed(1) + ' hPa';
                 }
-            })
-            .catch(err => console.log('连接后端失败', err));
-    }
+            }).catch(err => console.log('拉取数据失败', err));
+        }
+        setInterval(fetchCloudData, 15000); fetchCloudData();
 
-    // 每隔 15 秒向后端请求一次
-    setInterval(fetchMyBackend, 15000);
-    fetchMyBackend();
-</script>
+        // 3. 互动点击逻辑：穿搭与建筑防潮
+        function checkClothes() {
+            let title = "👕 材质穿搭建议";
+            let text = "";
+            if (currentT < 10 || (currentT < 15 && currentH > 70)) {
+                text = `当前温度较低且湿度偏高，体感极度阴冷。<br><br>外出建议直接选择保暖性极佳的<strong>“特厚羊毛内胆”</strong>款式以强效御寒。`;
+            } else {
+                text = `当前环境温度较为适中。<br><br>若在室内长时间活动，更推荐穿着<strong>“加厚莫代尔 + 真丝内胆”</strong>的款式，其肤感更优且不易产生闷汗感。`;
+            }
+            openModal(title, text);
+        }
+
+        function checkHomestead() {
+            let title = "🏠 宅基地防潮评估雷达";
+            let text = "";
+            if (currentH > 75) {
+                text = `⚠️ 雷达检测当前湿度高达 <strong>${currentH}%</strong>，极易引起墙面受潮与霉菌滋生。<br><br>若此环境为长时间无人看管的宅基地或闲置老屋，请务必择日安排开窗通风；若后续有翻新或出售计划，请重点关注房屋内部的除湿防潮工程。`;
+            } else {
+                text = `✅ 雷达检测当前湿度为 <strong>${currentH}%</strong>，处于安全范围。<br><br>环境干爽，非常适合在庭院开展晾晒作业，或进行老屋的修缮与翻新施工。`;
+            }
+            openModal(title, text);
+        }
+
+        // 4. 弹窗控制函数
+        function openModal(title, text) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-text').innerHTML = text;
+            document.getElementById('myModal').style.display = 'flex';
+        }
+        function closeModal() { document.getElementById('myModal').style.display = 'none'; }
+
+        // 5. 3D 翻转控制与黄金看板
+        function flipToGold() { document.getElementById('flip-box').classList.add('flipped'); }
+        function flipToWeather() { document.getElementById('flip-box').classList.remove('flipped'); }
+        
+        setInterval(() => {
+            let basePrice = 485.00;
+            let fluctuation = (Math.random() * 2 - 1).toFixed(2);
+            document.getElementById('gold-price').innerText = (basePrice + parseFloat(fluctuation)).toFixed(2);
+        }, 3000);
+    </script>
 </body>
 </html>
