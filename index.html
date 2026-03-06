@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>全域智能管家 (雷达版)</title>
+    <title>全球智能气象管家</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, sans-serif; min-height: 100vh; display: flex; justify-content: center; align-items: center; background: linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%); transition: background 1s ease; color: white; padding: 15px;}
@@ -12,15 +12,17 @@
         .flipper { transition: 0.8s; transform-style: preserve-3d; position: relative; width: 100%; height: 780px; }
         .front, .back { backface-visibility: hidden; position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 30px; background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.3); box-shadow: 0 15px 35px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
         .front { padding: 25px; gap: 12px; }
-        
-        /* 背面雷达图特殊样式：取消内边距，让地图铺满 */
         .back { transform: rotateY(180deg); background: #2c3e50; padding: 0; overflow: hidden;}
         .flip-container.flipped .flipper { transform: rotateY(180deg); }
 
-        .header { display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 1.1rem; opacity: 0.9;}
-        
-        .city-select { background: rgba(0,0,0,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); padding: 5px 10px; border-radius: 10px; font-size: 1rem; outline: none; cursor: pointer; font-weight: bold;}
-        .city-select option { background: #2c3e50; color: white; }
+        /* 全新的搜索栏布局 */
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 600; font-size: 1rem; opacity: 0.95;}
+        .search-container { display: flex; flex-grow: 1; gap: 5px; }
+        .city-search-input { flex-grow: 1; background: rgba(0,0,0,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); padding: 8px 12px; border-radius: 12px; font-size: 0.95rem; outline: none; transition: 0.3s;}
+        .city-search-input::placeholder { color: rgba(255,255,255,0.6); }
+        .city-search-input:focus { background: rgba(0,0,0,0.4); border-color: white;}
+        .icon-btn { background: rgba(0,0,0,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); border-radius: 12px; width: 38px; height: 38px; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: 0.2s; font-size: 1.1rem;}
+        .icon-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.3);}
 
         .main-weather { text-align: center; margin: 5px 0; }
         .temp-display { font-size: 5.5rem; font-weight: 700; line-height: 1; text-shadow: 2px 4px 10px rgba(0,0,0,0.15); }
@@ -40,8 +42,6 @@
         .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: auto;}
         .action-btn { background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.4); padding: 12px 5px; border-radius: 15px; color: white; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; text-align: center; display: flex; align-items: center; justify-content: center;}
         .action-btn:active { transform: scale(0.95); }
-        
-        /* 全新的地球雷达按钮样式 */
         .btn-radar { grid-column: span 2; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border: none; font-size: 1rem; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);}
 
         .modal { display: none; position: fixed; z-index: 10; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); justify-content: center; align-items: center; padding: 20px;}
@@ -55,20 +55,17 @@
         <div class="flipper">
             <div class="front">
                 <div class="header">
-                    <select class="city-select" id="location-select" onchange="switchLocation()">
-                        <option value="esp32">📍 我的室内</option>
-                        <option value="changsha">湖南 长沙 </option>
-                        <option value="beijing">北京 </option>
-                        <option value="shanghai">上海 </option>
-                        <option value="guangzhou">广州 </option>
-                    </select>
-                    <div id="clock">00:00</div>
+                    <button class="icon-btn" onclick="switchToESP32()" title="一键返回我的房间">🏠</button>
+                    <div class="search-container">
+                        <input type="text" id="city-input" class="city-search-input" placeholder="输入城市名，如: 深圳" onkeypress="handleEnter(event)">
+                        <button class="icon-btn" onclick="searchCity()">🔍</button>
+                    </div>
                 </div>
                 
                 <div class="main-weather">
                     <div class="temp-display"><span id="temp">--</span>°</div>
                     <div class="feels-like">体感温度 <span id="feels-like">--</span>°C</div>
-                    <div class="weather-desc" id="desc">正在连接数据源...</div>
+                    <div class="weather-desc" id="desc">系统初始化...</div>
                 </div>
 
                 <div class="life-index">
@@ -120,48 +117,65 @@
         let sessionMaxT = -100, sessionMinT = 100;
         let activeTimer = null;
 
-        // 各城市真实的经纬度坐标库
-        const cityCoordinates = {
-            "changsha": { lat: 28.23, lon: 112.93 },
-            "beijing": { lat: 39.90, lon: 116.40 },
-            "shanghai": { lat: 31.23, lon: 121.47 },
-            "guangzhou": { lat: 23.13, lon: 113.28 },
-            "china_center": { lat: 35.86, lon: 104.19 } // 中国版图中心点
-        };
-
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('clock').innerText = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-        }
-        setInterval(updateClock, 1000); updateClock();
-
-        // 核心路由控制器
-        function switchLocation() {
-            let loc = document.getElementById('location-select').value;
+        // 核心一：一键回到 ESP32 硬件房间
+        function switchToESP32() {
             clearInterval(activeTimer);
+            document.getElementById('city-input').value = ""; // 清空搜索框
+            document.getElementById('desc').innerText = "🔗 连接室内传感器...";
             
-            if (loc === "esp32") {
-                fetchESP32Data();
-                activeTimer = setInterval(fetchESP32Data, 15000);
-                // 雷达图默认定位到中国全图
-                updateRadarMap(cityCoordinates["china_center"].lat, cityCoordinates["china_center"].lon, 4);
-            } else {
-                fetchRealCityData(cityCoordinates[loc].lat, cityCoordinates[loc].lon);
-                activeTimer = setInterval(() => fetchRealCityData(cityCoordinates[loc].lat, cityCoordinates[loc].lon), 600000);
-                // 联动：雷达图自动放大并飞到所选城市上空！
-                updateRadarMap(cityCoordinates[loc].lat, cityCoordinates[loc].lon, 7);
+            fetchESP32Data();
+            activeTimer = setInterval(fetchESP32Data, 15000); // 室内数据每15秒刷新
+            updateRadarMap(35.86, 104.19, 4); // 雷达切回中国全景图
+        }
+
+        // 核心二：全球地名搜索引擎 (利用免费 Geocoding API)
+        async function searchCity() {
+            let query = document.getElementById('city-input').value.trim();
+            if (!query) return;
+
+            document.getElementById('desc').innerText = "🔍 正在搜索云端...";
+            try {
+                // 向全球地名库询问经纬度
+                let res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=zh`);
+                let data = await res.json();
+                
+                if (data.results && data.results.length > 0) {
+                    let city = data.results[0];
+                    let lat = city.latitude;
+                    let lon = city.longitude;
+                    
+                    document.getElementById('desc').innerText = `✅ 定位成功: ${city.name}`;
+                    
+                    clearInterval(activeTimer);
+                    // 拿着搜到的经纬度，去获取当地真实气象
+                    fetchRealCityData(lat, lon);
+                    activeTimer = setInterval(() => fetchRealCityData(lat, lon), 600000); // 室外10分钟刷新即可
+                    
+                    // 让背面的雷达图精准飞到这个城市的上空！
+                    updateRadarMap(lat, lon, 7);
+                } else {
+                    alert("⚠️ 未找到该城市，请尝试输入拼音或更准确的名字！");
+                    document.getElementById('desc').innerText = "❌ 搜索失败";
+                }
+            } catch (err) {
+                alert("网络搜索出错！");
+                document.getElementById('desc').innerText = "❌ 网络异常";
             }
         }
 
-        // 更新背面雷达图的经纬度与层级
+        // 支持敲击回车键搜索
+        function handleEnter(e) {
+            if (e.key === 'Enter') searchCity();
+        }
+
+        // 更新背面雷达图
         function updateRadarMap(lat, lon, zoom) {
             const iframe = document.getElementById('radar-iframe');
-            // 构造 Windy 专属的嵌套 URL，默认显示“风力(wind)”图层，你也可以改成“降雨(rain)”
             const radarUrl = `https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=%C2%B0C&metricWind=km%2Fh&zoom=${zoom}&overlay=wind&product=ecmwf&level=surface&lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}`;
             iframe.src = radarUrl;
         }
 
-        // 数据源 1：拉取私有硬件数据
+        // 拉取室内硬件数据
         function fetchESP32Data() {
             const url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${READ_API_KEY}&results=1`;
             fetch(url).then(res => res.json()).then(data => {
@@ -175,7 +189,7 @@
             }).catch(err => console.log('ESP32 数据拉取失败', err));
         }
 
-        // 数据源 2：拉取公网真实气象数据
+        // 拉取公网真实气象数据
         function fetchRealCityData(lat, lon) {
             const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m&timezone=Asia%2FShanghai`;
             fetch(url).then(res => res.json()).then(data => {
@@ -193,7 +207,7 @@
             }).catch(err => console.log('城市数据拉取失败', err));
         }
 
-        // 通用 UI 渲染
+        // 通用 UI 渲染与智能推算
         function renderUI(t, h) {
             if (t > sessionMaxT) sessionMaxT = t;
             if (t < sessionMinT) sessionMinT = t;
@@ -211,14 +225,18 @@
             else if (t <= 15) { yi = "泡脚、添衣保暖"; ji = "吃冷饮"; uvStr = "很弱"; descStr = '🥶 寒气袭人'; bgStr = 'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)'; }
             if (h >= 75) { ji += "、晾晒衣物"; if (t > 25) descStr = '💦 闷热潮湿'; }
             
+            let query = document.getElementById('city-input').value.trim();
+            if (!query) document.getElementById('desc').innerText = descStr; // 没搜索时才显示体感文案
+            
             document.getElementById('yi-text').innerText = yi; document.getElementById('ji-text').innerText = ji;
-            document.getElementById('desc').innerText = descStr; document.getElementById('uv').innerText = uvStr;
+            document.getElementById('uv').innerText = uvStr;
             document.getElementById('bg').style.background = bgStr;
         }
 
-        switchLocation();
+        // 初始化：默认先拉取 ESP32 的数据
+        switchToESP32();
 
-        // 弹窗与 3D 翻转保留原有逻辑
+        // 弹窗与 3D 翻转控制
         function checkClothes() {
             let title = "👕 材质穿搭建议";
             let text = currentT < 15 ? "当前环境阴冷。<br><br>外出建议直接选择保暖性极佳的<strong>“特厚羊毛内胆”</strong>款式以强效御寒。" : "当前环境适中。<br><br>推荐穿着<strong>“加厚莫代尔 + 真丝内胆”</strong>的款式，其肤感更优且不易产生闷汗感。";
@@ -232,7 +250,6 @@
         function openModal(title, text) { document.getElementById('modal-title').innerText = title; document.getElementById('modal-text').innerHTML = text; document.getElementById('myModal').style.display = 'flex'; }
         function closeModal() { document.getElementById('myModal').style.display = 'none'; }
         
-        // 控制卡片翻转
         function flipToMap() { document.getElementById('flip-box').classList.add('flipped'); }
         function flipToWeather() { document.getElementById('flip-box').classList.remove('flipped'); }
     </script>
