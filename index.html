@@ -6,9 +6,27 @@
     <title>全球智能气象管家</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, sans-serif; min-height: 100vh; display: flex; justify-content: center; align-items: center; background: linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%); transition: background 1s ease; color: white; padding: 15px;}
+        /* 1. 修改 body 样式：删掉 align-items: center，增加上下 padding 留出滑动空间 */
+        body { 
+            font-family: -apple-system, sans-serif; 
+            min-height: 100vh; 
+            display: flex; 
+            justify-content: center; 
+            background: linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%); 
+            transition: background 1s ease; 
+            color: white; 
+            padding: 30px 15px; /* 上下留出30px，左右15px */
+        }
         
-        .flip-container { perspective: 1000px; width: 100%; max-width: 420px; }
+   
+        
+        /* 2. 修改 flip-container：增加 margin: auto */
+        .flip-container { 
+            perspective: 1000px; 
+            width: 100%; 
+            max-width: 420px; 
+            margin: auto; /* 核心魔法：屏幕长时自动居中，屏幕短时允许滑动！ */
+        }
         .flipper { transition: 0.8s; transform-style: preserve-3d; position: relative; width: 100%; height: 780px; }
         .front, .back { backface-visibility: hidden; position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 30px; background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.3); box-shadow: 0 15px 35px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
         .front { padding: 25px; gap: 12px; }
